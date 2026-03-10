@@ -10,7 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 1. Create claude system user
 # ---------------------------------------------------------------------------
 if ! id -u claude &>/dev/null; then
-  useradd --shell /bin/bash \
+  useradd --system \
+          --shell /bin/bash \
           --home-dir /home/claude \
           --create-home \
           claude
