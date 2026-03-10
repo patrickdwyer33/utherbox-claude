@@ -1,46 +1,28 @@
 #!/usr/bin/env bash
 # utherbox-claude/setup.sh
-# Runs as root via cloud-init on each new project VM, after utherbox-toolserver/setup.sh.
-# Creates the claude user, installs Claude Code natively, and configures MCP servers + skills.
+# Runs as the claude user via cloud-init (su - claude -c "bash .../setup.sh").
+# Prerequisites (handled by cloud-init's setup-privileged.sh, which runs first):
+#   - claude user and home directory created
+#   - toolserver added to claude group (for dns-mcp chgrp of TLS keys)
+#   - MCP binaries installed at /usr/local/bin/vm-mcp and /usr/local/bin/dns-mcp
 set -euo pipefail
 
+# su - sets working directory to $HOME (/home/claude), not the repo root.
+# Use SCRIPT_DIR for all repo-relative paths.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
-# 1. Create claude system user
+# 1. Install Claude Code natively
 # ---------------------------------------------------------------------------
-if ! id -u claude &>/dev/null; then
-  useradd --system \
-          --shell /bin/bash \
-          --home-dir /home/claude \
-          --create-home \
-          claude
-fi
+# Installs standalone binary to ~/.local/bin/claude. Never run as root.
+curl -fsSL https://claude.ai/install.sh | bash
 
 # ---------------------------------------------------------------------------
-# 2. Add toolserver to claude group so dns-mcp can chgrp TLS private keys
+# 2. Create Claude config directory and write MCP server configuration
 # ---------------------------------------------------------------------------
-# dns-mcp runs as toolserver (setuid). For it to set key.pem group to claude
-# (mode 0640), toolserver must be a member of the claude group.
-if id -u toolserver &>/dev/null; then
-  usermod -aG claude toolserver
-fi
+mkdir -p ~/.claude
 
-# ---------------------------------------------------------------------------
-# 3. Install Claude Code natively as the claude user
-# ---------------------------------------------------------------------------
-# Installs standalone binary to ~claude/.local/bin/claude. Never run as root.
-su -c "curl -fsSL https://claude.ai/install.sh | bash" claude
-
-# ---------------------------------------------------------------------------
-# 4. Create Claude config directory
-# ---------------------------------------------------------------------------
-mkdir -p /home/claude/.claude
-
-# ---------------------------------------------------------------------------
-# 5. Write MCP server configuration
-# ---------------------------------------------------------------------------
-cat > /home/claude/.claude/settings.json << 'EOF'
+cat > ~/.claude/settings.json << 'EOF'
 {
   "mcpServers": {
     "vm-networking": {
@@ -56,22 +38,18 @@ cat > /home/claude/.claude/settings.json << 'EOF'
 EOF
 
 # ---------------------------------------------------------------------------
-# 6. Install standalone skills
+# 3. Install standalone skills
 # ---------------------------------------------------------------------------
 # Skills in ~/.claude/skills/<name>/SKILL.md are auto-loaded by Claude Code.
+# Use SCRIPT_DIR (not a relative path) — working dir is $HOME, not the repo root.
 if [ -d "$SCRIPT_DIR/skills" ]; then
-  mkdir -p /home/claude/.claude/skills
-  cp -r "$SCRIPT_DIR/skills/." /home/claude/.claude/skills/
+  mkdir -p ~/.claude/skills
+  cp -r "$SCRIPT_DIR/skills/." ~/.claude/skills/
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Plugins — placeholder
+# 4. Plugins — placeholder
 # ---------------------------------------------------------------------------
 # (reserved for future plugin installation)
-
-# ---------------------------------------------------------------------------
-# 8. Set ownership
-# ---------------------------------------------------------------------------
-chown -R claude:claude /home/claude
 
 echo "utherbox-claude setup complete"
