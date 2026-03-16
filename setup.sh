@@ -18,11 +18,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 curl -fsSL https://claude.ai/install.sh | bash
 
 # ---------------------------------------------------------------------------
-# 2. Create Claude config directory and write MCP server configuration
+# 2. Write MCP server configuration
 # ---------------------------------------------------------------------------
+# Claude Code reads global MCP servers from ~/.claude.json, not ~/.claude/settings.json.
 mkdir -p ~/.claude
 
-cat > ~/.claude/settings.json << 'EOF'
+cat > ~/.claude.json << 'EOF'
 {
   "mcpServers": {
     "vm-networking": {
