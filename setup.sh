@@ -49,8 +49,25 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Plugins — placeholder
+# 4. Install hooks
 # ---------------------------------------------------------------------------
-# (reserved for future plugin installation)
+if [ -d "$SCRIPT_DIR/hooks" ]; then
+  mkdir -p ~/.claude/hooks
+  cp "$SCRIPT_DIR/hooks/"* ~/.claude/hooks/
+  chmod +x ~/.claude/hooks/*.sh
+fi
+
+# Wire UserPromptSubmit hook into Claude Code settings
+node - << 'JSEOF'
+const fs = require('fs');
+const settingsPath = process.env.HOME + '/.claude/settings.json';
+const settings = fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {};
+settings.hooks = settings.hooks || {};
+settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
+const hook = { type: 'command', command: process.env.HOME + '/.claude/hooks/list-vms.sh' };
+const already = settings.hooks.UserPromptSubmit.some(h => h.command === hook.command);
+if (!already) settings.hooks.UserPromptSubmit.push(hook);
+fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+JSEOF
 
 echo "utherbox-claude setup complete"

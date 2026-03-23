@@ -2,39 +2,36 @@
 description: Handle tasks requiring root or sudo by offering to migrate work to a child VM
 ---
 
-You have no sudo access on this VM. When a task requires root or sudo:
+No sudo access on this VM. Follow this flow exactly.
 
-## When This Applies
+## Triggers
 
-Any task needing `sudo`, root access, system package installation, binding ports below 1024,
-writing to system paths, or modifying kernel/system configuration.
+`sudo`, root access, system package install, port < 1024, writing to system paths, kernel/system config changes.
 
-## What To Do
+## Flow
 
-1. **Stop** — do not attempt the root-requiring action
+| Step | Action |
+|------|--------|
+| 1 | **Stop** — do not attempt the root-requiring action |
+| 2 | **Ask the user** — state specifically what needs root, then ask if they want a child VM |
+| 3 | **User declines** → drop the root approach entirely, discuss alternatives, do not provision |
+| 4 | **User confirms** → provision, migrate, continue (see below) |
 
-2. **Ask the user** — explain specifically what needs root and why, then ask:
-   > "This requires root access, which I don't have on this VM. I can spin up a child VM
-   > and continue working from there. Should I do that, or would you prefer a different approach?"
+## If User Confirms: Migration Steps
 
-3. **If the user declines** — drop the approach requiring root entirely and discuss alternatives.
-   Do not provision a VM.
+1. Provision child VM via `create_vm` (vm-mcp)
+2. SSH in as root
+3. Reconstruct context: clone repos, copy in-progress files
+4. Continue all subsequent work from the child VM — treat it as the new base unless the user says otherwise
 
-4. **If the user confirms:**
-   - Provision a child VM using the `create_vm` tool (vm-networking MCP server)
-   - SSH into the child VM
-   - Reconstruct the working context: clone any relevant repos, copy in-progress files
-   - Continue all subsequent work from the child VM
-   - Treat the child VM as the new working base for this task and everything that follows,
-     unless the user explicitly says to return to the main VM
+## Record the Migration
 
-5. **Record the migration** — append to `~/CLAUDE.md` on this (main) VM so future Claude
-   sessions know where work has moved:
+Append to `~/CLAUDE.md` on this VM:
 
-   ```markdown
-   ## Active work moved to child VM
-   - VM: <name> (<ip>)
-   - Moved: <YYYY-MM-DD>
-   - Reason: <what specifically needed root>
-   - Resume: SSH into the child VM and continue from ~/
-   ```
+```markdown
+## Active work moved to child VM
+- VM: <name> (<ip>)
+- Moved: <YYYY-MM-DD>
+- Reason: <what needed root>
+- Resume: SSH into child VM, continue from ~/
+```
