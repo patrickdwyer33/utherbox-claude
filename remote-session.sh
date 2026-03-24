@@ -55,8 +55,15 @@ trap 'rm -f "$REGISTERED_FILE"' EXIT
 echo "y" | /home/claude/.local/bin/claude remote-control --name "Utherbox $PROJECT_ID" 2>&1 | \
   while IFS= read -r line; do
     echo "$line"
-    # Strip ANSI escape sequences to get a clean line for URL matching
-    clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b[()][AB]//g')
+    # Strip ANSI escape sequences and OSC8 hyperlinks to get a clean line for URL matching.
+    # OSC8 format: ESC]8;;URL BEL link-text ESC]8;; BEL — replace with just the URL.
+    clean_line=$(printf '%s' "$line" | python3 -c "
+import sys, re
+line = sys.stdin.read()
+line = re.sub(r'\x1b\]8;;([^\x07]*)\x07[^\x1b]*\x1b\]8;;\x07', r'\1', line)
+line = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', line)
+sys.stdout.write(line)
+")
     if [ ! -s "$REGISTERED_FILE" ] && [[ "$clean_line" =~ https://claude\.ai/code/[^[:space:]]+ ]]; then
       URL="${BASH_REMATCH[0]}"
       echo "Registering session URL: $URL"
