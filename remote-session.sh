@@ -25,6 +25,13 @@ fi
 
 echo "Starting claude remote-control for project $PROJECT_ID"
 
+# Claude Code writes hasTrustDialogAccepted=false when it starts non-interactively.
+# Set it to true immediately before each run so the trust check passes at startup.
+if [ -f ~/.claude.json ]; then
+  jq '.projects //= {} | .projects["/home/claude"] //= {} | .projects["/home/claude"].hasTrustDialogAccepted = true' \
+    ~/.claude.json > /tmp/claude-trust.json && mv /tmp/claude-trust.json ~/.claude.json
+fi
+
 # Use a temp file as a flag so the URL is registered only once per run,
 # even though the pipe body runs in a subshell.
 REGISTERED_FILE=$(mktemp)
