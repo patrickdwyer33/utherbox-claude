@@ -10,6 +10,8 @@ User=claude
 # This prevents a crash-restart loop when the user hasn't linked Claude auth yet.
 ConditionPathExists=/home/claude/.claude/.credentials.json
 ExecStart=/home/claude/utherbox-claude/remote-session.sh
+StandardOutput=append:/home/claude/remote-session.log
+StandardError=append:/home/claude/remote-session.log
 Restart=on-failure
 RestartSec=10
 # Stop restarting after 5 failures in 5 minutes (e.g. revoked credentials).
