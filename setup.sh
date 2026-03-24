@@ -74,9 +74,10 @@ const settingsPath = process.env.HOME + '/.claude/settings.json';
 const settings = fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settingsPath, 'utf8')) : {};
 settings.hooks = settings.hooks || {};
 settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
-const hook = { type: 'command', command: process.env.HOME + '/.claude/hooks/list-vms.sh' };
-const already = settings.hooks.UserPromptSubmit.some(h => h.command === hook.command);
-if (!already) settings.hooks.UserPromptSubmit.push(hook);
+const cmd = process.env.HOME + '/.claude/hooks/list-vms.sh';
+// New format: each entry is { matcher: string, hooks: [{type, command}] }
+const already = settings.hooks.UserPromptSubmit.some(e => e.hooks && e.hooks.some(h => h.command === cmd));
+if (!already) settings.hooks.UserPromptSubmit.push({ matcher: '', hooks: [{ type: 'command', command: cmd }] });
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 JSEOF
 
