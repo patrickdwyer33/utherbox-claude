@@ -17,6 +17,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Installs standalone binary to ~/.local/bin/claude. Never run as root.
 curl -fsSL https://claude.ai/install.sh | bash
 
+# Pre-accept workspace trust so remote-control can start non-interactively.
+# Runs once here; subsequent invocations (including remote-control) skip the prompt.
+claude --dangerously-skip-permissions --print "ok" 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # 2. Write MCP server configuration
 # ---------------------------------------------------------------------------

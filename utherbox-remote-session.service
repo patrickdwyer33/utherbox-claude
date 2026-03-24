@@ -1,0 +1,20 @@
+[Unit]
+Description=Utherbox Remote Session
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude
+# Skip start entirely if OAuth credentials were not injected at provisioning.
+# This prevents a crash-restart loop when the user hasn't linked Claude auth yet.
+ConditionPathExists=/home/claude/.claude/.credentials.json
+ExecStart=/home/claude/utherbox-claude/remote-session.sh
+Restart=on-failure
+RestartSec=10
+# Stop restarting after 5 failures in 5 minutes (e.g. revoked credentials).
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=multi-user.target
