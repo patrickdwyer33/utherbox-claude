@@ -14,7 +14,7 @@ ExecStart=/home/claude/utherbox-claude/remote-session.sh
 Environment=PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 StandardOutput=append:/home/claude/remote-session.log
 StandardError=append:/home/claude/remote-session.log
-Restart=on-failure
+Restart=always
 RestartSec=10
 # Stop restarting after 5 failures in 5 minutes (e.g. revoked credentials).
 StartLimitBurst=5
