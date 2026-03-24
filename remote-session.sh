@@ -52,7 +52,7 @@ trap 'rm -f "$REGISTERED_FILE"' EXIT
 # Strip ANSI escape sequences before matching the URL.
 # pipefail means a non-zero exit from claude propagates through the pipe,
 # causing this script to exit non-zero and triggering a systemd restart.
-echo "y" | /home/claude/.local/bin/claude remote-control --name "Utherbox $PROJECT_ID" 2>&1 | \
+echo "y" | /home/claude/.local/bin/claude remote-control --name "${PROJECT_NAME:-$PROJECT_ID}" 2>&1 | \
   while IFS= read -r line; do
     echo "$line"
     # Strip ANSI escape sequences and OSC8 hyperlinks to get a clean line for URL matching.
