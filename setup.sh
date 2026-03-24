@@ -26,9 +26,15 @@ grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc 2>/dev/null \
 # Installs standalone binary to ~/.local/bin/claude. Never run as root.
 curl -fsSL https://claude.ai/install.sh | bash
 
-# Pre-accept workspace trust so remote-control can start non-interactively.
-# Runs once here; subsequent invocations (including remote-control) skip the prompt.
+# Initialize ~/.claude.json by running claude once, then pre-accept workspace
+# trust for /home/claude so remote-control starts without the trust dialog.
+# --dangerously-skip-permissions bypasses tool permission prompts for this run only;
+# the hasTrustDialogAccepted flag is what remote-control actually checks.
 claude --dangerously-skip-permissions --print "ok" 2>/dev/null || true
+if [ -f ~/.claude.json ]; then
+  jq '.projects //= {} | .projects["/home/claude"] //= {} | .projects["/home/claude"].hasTrustDialogAccepted = true' \
+    ~/.claude.json > /tmp/claude-trust.json && mv /tmp/claude-trust.json ~/.claude.json
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Write MCP server configuration
