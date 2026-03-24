@@ -15,8 +15,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 1. Install Claude Code natively
 # ---------------------------------------------------------------------------
 # Ensure ~/.local/bin is on PATH for this session and future logins.
+# Write to .profile (sourced by login shells, including SSH) and .bashrc.
 mkdir -p ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
+grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.profile 2>/dev/null \
+  || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc 2>/dev/null \
   || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
