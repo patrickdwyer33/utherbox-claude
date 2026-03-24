@@ -14,6 +14,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ---------------------------------------------------------------------------
 # 1. Install Claude Code natively
 # ---------------------------------------------------------------------------
+# Ensure ~/.local/bin is on PATH for this session and future logins.
+mkdir -p ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc 2>/dev/null \
+  || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
 # Installs standalone binary to ~/.local/bin/claude. Never run as root.
 curl -fsSL https://claude.ai/install.sh | bash
 
