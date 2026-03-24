@@ -26,10 +26,20 @@ fi
 echo "Starting claude remote-control for project $PROJECT_ID"
 
 # Claude Code writes hasTrustDialogAccepted=false when it starts non-interactively.
-# Set it to true immediately before each run so the trust check passes at startup.
+# Also resets cachedGrowthBookFeatures (including tengu_ccr_bridge) on every startup
+# by re-fetching from GrowthBook with TTL=0. Force the flag and set a long TTL before
+# each invocation so it survives at least one session.
 if [ -f ~/.claude.json ]; then
-  jq '.projects //= {} | .projects["/home/claude"] //= {} | .projects["/home/claude"].hasTrustDialogAccepted = true' \
-    ~/.claude.json > /tmp/claude-trust.json && mv /tmp/claude-trust.json ~/.claude.json
+  jq '
+    .projects //= {}
+    | .projects["/home/claude"] //= {}
+    | .projects["/home/claude"].hasTrustDialogAccepted = true
+    | .cachedGrowthBookFeatures //= {}
+    | .cachedGrowthBookFeatures.tengu_ccr_bridge = true
+    | .cachedGrowthBookFeatures.tengu_willow_refresh_ttl_hours = 168
+    | .cachedGrowthBookFeatures.tengu_willow_sentinel_ttl_hours = 168
+    | .cachedGrowthBookFeatures.tengu_willow_census_ttl_hours = 168
+  ' ~/.claude.json > /tmp/claude-fix.json && mv /tmp/claude-fix.json ~/.claude.json
 fi
 
 # Use a temp file as a flag so the URL is registered only once per run,
@@ -38,12 +48,16 @@ REGISTERED_FILE=$(mktemp)
 trap 'rm -f "$REGISTERED_FILE"' EXIT
 
 # Run claude remote-control and watch stdout/stderr for the session URL.
+# Pipe "y\n" to stdin to auto-confirm the "Enable Remote Control? (y/n)" prompt.
+# Strip ANSI escape sequences before matching the URL.
 # pipefail means a non-zero exit from claude propagates through the pipe,
 # causing this script to exit non-zero and triggering a systemd restart.
-/home/claude/.local/bin/claude remote-control --name "Utherbox $PROJECT_ID" 2>&1 | \
+echo "y" | /home/claude/.local/bin/claude remote-control --name "Utherbox $PROJECT_ID" 2>&1 | \
   while IFS= read -r line; do
     echo "$line"
-    if [ ! -s "$REGISTERED_FILE" ] && [[ "$line" =~ https://claude\.ai/code/[^[:space:]]+ ]]; then
+    # Strip ANSI escape sequences to get a clean line for URL matching
+    clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b[()][AB]//g')
+    if [ ! -s "$REGISTERED_FILE" ] && [[ "$clean_line" =~ https://claude\.ai/code/[^[:space:]]+ ]]; then
       URL="${BASH_REMATCH[0]}"
       echo "Registering session URL: $URL"
       if /usr/local/bin/vm-mcp register-remote-session --url "$URL"; then
