@@ -9,6 +9,7 @@ User=claude
 # Skip start entirely if OAuth credentials were not injected at provisioning.
 # This prevents a crash-restart loop when the user hasn't linked Claude auth yet.
 ConditionPathExists=/home/claude/.claude/.credentials.json
+WorkingDirectory=/home/claude
 ExecStart=/home/claude/utherbox-claude/remote-session.sh
 Environment=PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 StandardOutput=append:/home/claude/remote-session.log
