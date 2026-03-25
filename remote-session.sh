@@ -47,9 +47,11 @@ if [ -f ~/.claude.json ]; then
   ' ~/.claude.json > /tmp/claude-fix.json && mv /tmp/claude-fix.json ~/.claude.json
 fi
 
-# Temp file to ensure URL is registered only once per run.
+# Temp files for session tracking, login error detection, and credential refresh.
 REGISTERED_FILE=$(mktemp)
-trap 'rm -f "$REGISTERED_FILE"' EXIT
+LOGIN_ERROR_FILE=$(mktemp)
+CREDS_TMPFILE=$(mktemp)
+trap 'rm -f "$REGISTERED_FILE" "$LOGIN_ERROR_FILE" "$CREDS_TMPFILE"' EXIT
 
 # Pipe "y" to auto-confirm the "Enable Remote Control? (y/n)" prompt.
 # pipefail: non-zero exit from claude propagates, triggering systemd restart.
@@ -78,4 +80,27 @@ sys.stdout.write(line)
         exit 1
       fi
     fi
-  done
+    if echo "$clean_line" | grep -qi "you must be logged in"; then
+      echo "Login error detected — will refresh credentials"
+      echo "1" > "$LOGIN_ERROR_FILE"
+    fi
+  done || true
+
+if [ -s "$LOGIN_ERROR_FILE" ]; then
+  echo "Fetching fresh Claude credentials from platform API"
+  HTTP_CODE=$(curl -s -o "$CREDS_TMPFILE" -w "%{http_code}" \
+    "$PLATFORM_API_BASE_URL/vms/me/claude-credentials" \
+    -H "Authorization: Bearer $PLATFORM_API_TOKEN")
+  if [ "$HTTP_CODE" = "200" ]; then
+    install -m 600 "$CREDS_TMPFILE" /home/claude/.claude/.credentials.json
+    echo "Credentials refreshed — restarting"
+    exit 1
+  elif [ "$HTTP_CODE" = "404" ]; then
+    echo "No Claude credentials on file — removing stale credentials and stopping"
+    rm -f /home/claude/.claude/.credentials.json
+    exit 0
+  else
+    echo "Failed to fetch credentials from platform API (HTTP ${HTTP_CODE:-curl_error})"
+    exit 1
+  fi
+fi
