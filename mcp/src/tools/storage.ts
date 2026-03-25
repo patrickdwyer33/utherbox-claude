@@ -35,7 +35,8 @@ export function registerStorageTools(server: McpServer, client: ApiClient): void
     },
     async ({ name }) => {
       const result = await client.delete(`/buckets/${name}`);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      const text = result !== undefined ? JSON.stringify(result, null, 2) : 'OK';
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 

@@ -24,6 +24,7 @@ export function registerVmTools(server: McpServer, client: ApiClient, projectId:
   server.tool(
     'list_vms',
     'List all VMs in this project.',
+    {},
     async () => {
       const result = await client.get(`/projects/${projectId}/vms`);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
@@ -50,7 +51,8 @@ export function registerVmTools(server: McpServer, client: ApiClient, projectId:
     },
     async ({ vm_id }) => {
       const result = await client.delete(`/vms/${vm_id}`);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      const text = result !== undefined ? JSON.stringify(result, null, 2) : 'OK';
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 

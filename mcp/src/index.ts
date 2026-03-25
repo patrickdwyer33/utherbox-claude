@@ -3,6 +3,12 @@ import * as os from 'os';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerVmTools } from './tools/vms.js';
+import { registerStorageTools } from './tools/storage.js';
+import { registerDnsTools } from './tools/dns.js';
+import { registerDomainsTools } from './tools/domains.js';
+import { registerLimitsTools } from './tools/limits.js';
+import { registerCloudflareTools } from './tools/cloudflare.js';
+import { registerClaudeAuthTools } from './tools/claude_auth.js';
 
 export interface Credentials {
   platform_api_token: string;
@@ -86,13 +92,6 @@ export class ApiClient {
     return res.json() as Promise<T>;
   }
 }
-
-import { registerStorageTools } from './tools/storage.js';
-import { registerDnsTools } from './tools/dns.js';
-import { registerDomainsTools } from './tools/domains.js';
-import { registerLimitsTools } from './tools/limits.js';
-import { registerCloudflareTools } from './tools/cloudflare.js';
-import { registerClaudeAuthTools } from './tools/claude_auth.js';
 
 async function main(): Promise<void> {
   const credsPath = `${os.homedir()}/.utherbox-credentials.json`;

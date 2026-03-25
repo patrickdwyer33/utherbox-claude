@@ -61,7 +61,8 @@ export function registerDnsTools(server: McpServer, client: ApiClient, projectId
     },
     async ({ record_id }) => {
       const result = await client.delete(`/cloudflare/records/${record_id}`);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      const text = result !== undefined ? JSON.stringify(result, null, 2) : 'OK';
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 
