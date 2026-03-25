@@ -80,11 +80,12 @@ sys.stdout.write(line)
         exit 1
       fi
     fi
-    if echo "$clean_line" | grep -qi "you must be logged in"; then
+    if [[ "${clean_line,,}" == *"you must be logged in"* ]]; then
       echo "Login error detected — will refresh credentials"
       echo "1" > "$LOGIN_ERROR_FILE"
     fi
-  done || true
+  done || PIPE_EXIT=$?
+PIPE_EXIT=${PIPE_EXIT:-0}
 
 if [ -s "$LOGIN_ERROR_FILE" ]; then
   echo "Fetching fresh Claude credentials from platform API"
@@ -104,3 +105,5 @@ if [ -s "$LOGIN_ERROR_FILE" ]; then
     exit 1
   fi
 fi
+
+exit $PIPE_EXIT
