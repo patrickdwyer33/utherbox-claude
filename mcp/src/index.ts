@@ -87,13 +87,12 @@ export class ApiClient {
   }
 }
 
-// Tool registration imports (added in subsequent tasks)
-// import { registerStorageTools } from './tools/storage.js';
-// import { registerDnsTools } from './tools/dns.js';
-// import { registerDomainsTools } from './tools/domains.js';
-// import { registerLimitsTools } from './tools/limits.js';
-// import { registerCloudflareTools } from './tools/cloudflare.js';
-// import { registerClaudeAuthTools } from './tools/claude_auth.js';
+import { registerStorageTools } from './tools/storage.js';
+import { registerDnsTools } from './tools/dns.js';
+import { registerDomainsTools } from './tools/domains.js';
+import { registerLimitsTools } from './tools/limits.js';
+import { registerCloudflareTools } from './tools/cloudflare.js';
+import { registerClaudeAuthTools } from './tools/claude_auth.js';
 
 async function main(): Promise<void> {
   const credsPath = `${os.homedir()}/.utherbox-credentials.json`;
@@ -132,6 +131,12 @@ async function main(): Promise<void> {
   });
 
   registerVmTools(server, client, projectId);
+  registerStorageTools(server, client);
+  registerDnsTools(server, client, projectId);
+  registerDomainsTools(server, client);
+  registerLimitsTools(server, client);
+  registerCloudflareTools(server, client);
+  registerClaudeAuthTools(server, client);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
