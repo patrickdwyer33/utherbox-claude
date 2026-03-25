@@ -8,6 +8,13 @@ export interface Credentials {
   platform_api_base_url: string;
 }
 
+export interface VmMe {
+  id: string;
+  name: string;
+  status: string;
+  project_id: string;
+}
+
 export class ApiClient {
   constructor(
     private readonly baseUrl: string,
@@ -72,6 +79,9 @@ export class ApiClient {
       const text = await res.text().catch(() => '');
       throw new Error(`DELETE ${path} → ${res.status}: ${text}`);
     }
+    if (res.status === 204 || res.headers.get('content-length') === '0') {
+      return undefined as unknown as T;
+    }
     return res.json() as Promise<T>;
   }
 }
@@ -109,7 +119,7 @@ async function main(): Promise<void> {
 
   let projectId: string;
   try {
-    const me = await client.get<{ id: string; project_id: string }>('/vms/me');
+    const me = await client.get<VmMe>('/vms/me');
     projectId = me.project_id;
   } catch (e) {
     process.stderr.write(`utherbox MCP: GET /vms/me failed: ${e}\n`);
@@ -122,7 +132,8 @@ async function main(): Promise<void> {
   });
 
   // Tools registered in subsequent tasks
-  void projectId; // suppress unused warning until tools are registered
+  // Remove this line when adding the first registerXxxTools() call below:
+  void projectId;
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
