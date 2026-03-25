@@ -3,32 +3,37 @@
 # Runs as the claude user via utherbox-remote-session.service.
 set -euo pipefail
 
-# Belt-and-suspenders: ConditionPathExists in the service file guards this too,
-# but exit cleanly here so a missing credentials file never causes a crash loop.
+# Skip if no Claude OAuth credentials (no crash-restart loop).
 if [ ! -f /home/claude/.claude/.credentials.json ]; then
   echo "No Claude credentials found — remote session not started"
   exit 0
 fi
 
+# Load VM_NAME from .utherbox-config (written by cloud-init).
 if [ ! -f /home/claude/.utherbox-config ]; then
-  echo "Missing /home/claude/.utherbox-config — cannot determine PROJECT_ID"
+  echo "Missing /home/claude/.utherbox-config — cannot determine VM_NAME"
   exit 1
 fi
-
 # shellcheck source=/dev/null
 source /home/claude/.utherbox-config
 
-if [ -z "${PROJECT_ID:-}" ]; then
-  echo "PROJECT_ID not set in /home/claude/.utherbox-config"
+if [ -z "${VM_NAME:-}" ]; then
+  echo "VM_NAME not set in /home/claude/.utherbox-config"
   exit 1
 fi
 
-echo "Starting claude remote-control for project $PROJECT_ID"
+# Load platform API credentials.
+PLATFORM_API_TOKEN=$(jq -r '.platform_api_token' /home/claude/.utherbox-credentials.json)
+PLATFORM_API_BASE_URL=$(jq -r '.platform_api_base_url' /home/claude/.utherbox-credentials.json)
 
-# Claude Code writes hasTrustDialogAccepted=false when it starts non-interactively.
-# Also resets cachedGrowthBookFeatures (including tengu_ccr_bridge) on every startup
-# by re-fetching from GrowthBook with TTL=0. Force the flag and set a long TTL before
-# each invocation so it survives at least one session.
+if [ -z "$PLATFORM_API_TOKEN" ] || [ "$PLATFORM_API_TOKEN" = "null" ]; then
+  echo "platform_api_token missing from ~/.utherbox-credentials.json"
+  exit 1
+fi
+
+echo "Starting claude remote-control for VM: $VM_NAME"
+
+# Re-apply trust flags before each invocation (Claude Code may reset them on start).
 if [ -f ~/.claude.json ]; then
   jq '
     .projects //= {}
@@ -42,21 +47,16 @@ if [ -f ~/.claude.json ]; then
   ' ~/.claude.json > /tmp/claude-fix.json && mv /tmp/claude-fix.json ~/.claude.json
 fi
 
-# Use a temp file as a flag so the URL is registered only once per run,
-# even though the pipe body runs in a subshell.
+# Temp file to ensure URL is registered only once per run.
 REGISTERED_FILE=$(mktemp)
 trap 'rm -f "$REGISTERED_FILE"' EXIT
 
-# Run claude remote-control and watch stdout/stderr for the session URL.
-# Pipe "y\n" to stdin to auto-confirm the "Enable Remote Control? (y/n)" prompt.
-# Strip ANSI escape sequences before matching the URL.
-# pipefail means a non-zero exit from claude propagates through the pipe,
-# causing this script to exit non-zero and triggering a systemd restart.
-echo "y" | /home/claude/.local/bin/claude remote-control --name "${PROJECT_NAME:-$PROJECT_ID}" 2>&1 | \
+# Pipe "y" to auto-confirm the "Enable Remote Control? (y/n)" prompt.
+# pipefail: non-zero exit from claude propagates, triggering systemd restart.
+echo "y" | /home/claude/.local/bin/claude remote-control --name "$VM_NAME" 2>&1 | \
   while IFS= read -r line; do
     echo "$line"
-    # Strip ANSI escape sequences and OSC8 hyperlinks to get a clean line for URL matching.
-    # OSC8 format: ESC]8;;URL BEL link-text ESC]8;; BEL — replace with just the URL.
+    # Strip ANSI escape sequences and OSC8 hyperlinks to get a clean URL.
     clean_line=$(printf '%s' "$line" | python3 -c "
 import sys, re
 line = sys.stdin.read()
@@ -67,11 +67,15 @@ sys.stdout.write(line)
     if [ ! -s "$REGISTERED_FILE" ] && [[ "$clean_line" =~ https://claude\.ai/code/[^[:space:]]+ ]]; then
       URL="${BASH_REMATCH[0]}"
       echo "Registering session URL: $URL"
-      if /usr/local/bin/vm-mcp register-remote-session --url "$URL"; then
+      if curl -sf -X POST "$PLATFORM_API_BASE_URL/vms/me/remote-session" \
+           -H "Authorization: Bearer $PLATFORM_API_TOKEN" \
+           -H "Content-Type: application/json" \
+           -d "{\"url\": \"$URL\"}"; then
         echo "$URL" > "$REGISTERED_FILE"
         echo "Session URL registered successfully"
       else
         echo "Registration failed — will retry on next restart"
+        exit 1
       fi
     fi
   done
