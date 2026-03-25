@@ -1,35 +1,34 @@
 #!/usr/bin/env bash
 # utherbox-claude/setup.sh
-# Runs as the claude user via cloud-init (su - claude -c "bash .../setup.sh").
-# Prerequisites (handled by cloud-init's setup-privileged.sh, which runs first):
-#   - claude user and home directory created
-#   - toolserver added to claude group (for dns-mcp chgrp of TLS keys)
-#   - MCP binaries installed at /usr/local/bin/vm-mcp and /usr/local/bin/dns-mcp
+# Runs as the claude user via cloud-init (runuser -l claude -c "bash .../setup.sh").
+# Prerequisites (handled by cloud-init's setup-privileged.sh before this runs):
+#   - claude user + home directory created
+#   - ~/.utherbox-credentials.json written (platform_api_token + platform_api_base_url)
+#   - ~/.ssh/id_ed25519 written (project private key, mode 600)
+#   - ~/.ssh/authorized_keys written
+#   - ~/.claude/.credentials.json written if Claude OAuth credentials were provided
+#   - /home/claude/.utherbox-config written (VM_NAME=<hostname>)
 set -euo pipefail
 
-# su - sets working directory to $HOME (/home/claude), not the repo root.
-# Use SCRIPT_DIR for all repo-relative paths.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
-# 1. Install Claude Code natively
+# 1. Install Claude Code
 # ---------------------------------------------------------------------------
-# Ensure ~/.local/bin is on PATH for this session and future logins.
-# Write to .profile (sourced by login shells, including SSH) and .bashrc.
 mkdir -p ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
 grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.profile 2>/dev/null \
   || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc 2>/dev/null \
   || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-
-# Installs standalone binary to ~/.local/bin/claude. Never run as root.
 curl -fsSL https://claude.ai/install.sh | bash
 
-# Initialize ~/.claude.json by running claude once, then pre-accept workspace
-# trust for /home/claude so remote-control starts without the trust dialog.
-# --dangerously-skip-permissions bypasses tool permission prompts for this run only;
-# the hasTrustDialogAccepted flag is what remote-control actually checks.
+# ---------------------------------------------------------------------------
+# 2. Pre-accept workspace trust for /home/claude
+# ---------------------------------------------------------------------------
+# Run claude once to initialize ~/.claude.json, then patch trust flag.
+# Note: trust is scoped per directory; /home/claude covers the default working
+# directory. --dangerously-skip-permissions is not needed for MCP startup.
 claude --dangerously-skip-permissions --print "ok" 2>/dev/null || true
 if [ -f ~/.claude.json ]; then
   jq '.projects //= {} | .projects["/home/claude"] //= {} | .projects["/home/claude"].hasTrustDialogAccepted = true' \
@@ -37,38 +36,51 @@ if [ -f ~/.claude.json ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Write MCP server configuration
+# 3. Install Node 20+ via NodeSource (distro nodejs is typically v12)
 # ---------------------------------------------------------------------------
-# Claude Code reads global MCP servers from ~/.claude.json, not ~/.claude/settings.json.
-mkdir -p ~/.claude
-
-cat > ~/.claude.json << 'EOF'
-{
-  "mcpServers": {
-    "vm-networking": {
-      "command": "/usr/local/bin/vm-mcp",
-      "args": []
-    },
-    "dns-acmecert": {
-      "command": "/usr/local/bin/dns-mcp",
-      "args": []
-    }
-  }
-}
-EOF
-
-# ---------------------------------------------------------------------------
-# 3. Install standalone skills
-# ---------------------------------------------------------------------------
-# Skills in ~/.claude/skills/<name>/SKILL.md are auto-loaded by Claude Code.
-# Use SCRIPT_DIR (not a relative path) — working dir is $HOME, not the repo root.
-if [ -d "$SCRIPT_DIR/skills" ]; then
-  mkdir -p ~/.claude/skills
-  cp -r "$SCRIPT_DIR/skills/." ~/.claude/skills/
+if ! node --version 2>/dev/null | grep -qE '^v(2[0-9]|[3-9][0-9])'; then
+  curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+  sudo apt-get install -y nodejs
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Install hooks
+# 4. Build the Node MCP
+# ---------------------------------------------------------------------------
+cd "$SCRIPT_DIR/mcp"
+npm ci
+npm run build
+cd "$SCRIPT_DIR"
+
+# ---------------------------------------------------------------------------
+# 5. Configure MCP server in ~/.claude.json (merge, do not clobber)
+# ---------------------------------------------------------------------------
+# Uses /usr/bin/node (absolute path) — avoids PATH resolution issues when
+# Claude Code spawns the MCP as a subprocess.
+node - << JSEOF
+const fs = require('fs');
+const path = process.env.HOME + '/.claude.json';
+const settings = fs.existsSync(path) ? JSON.parse(fs.readFileSync(path, 'utf8')) : {};
+settings.mcpServers = settings.mcpServers || {};
+settings.mcpServers.utherbox = {
+  command: '/usr/bin/node',
+  args: ['$SCRIPT_DIR/mcp/dist/index.js']
+};
+fs.writeFileSync(path, JSON.stringify(settings, null, 2));
+JSEOF
+
+# ---------------------------------------------------------------------------
+# 6. Install ~/CLAUDE.md
+# ---------------------------------------------------------------------------
+cp "$SCRIPT_DIR/UTHERBOX-CLAUDE.md" ~/CLAUDE.md
+
+# ---------------------------------------------------------------------------
+# 7. Install skills
+# ---------------------------------------------------------------------------
+mkdir -p ~/.claude/skills
+cp -r "$SCRIPT_DIR/skills/." ~/.claude/skills/
+
+# ---------------------------------------------------------------------------
+# 8. Install hooks
 # ---------------------------------------------------------------------------
 if [ -d "$SCRIPT_DIR/hooks" ]; then
   mkdir -p ~/.claude/hooks
@@ -76,7 +88,7 @@ if [ -d "$SCRIPT_DIR/hooks" ]; then
   chmod +x ~/.claude/hooks/*.sh
 fi
 
-# Wire UserPromptSubmit hook into Claude Code settings
+# Wire UserPromptSubmit hook into ~/.claude/settings.json
 node - << 'JSEOF'
 const fs = require('fs');
 const settingsPath = process.env.HOME + '/.claude/settings.json';
@@ -84,10 +96,20 @@ const settings = fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settin
 settings.hooks = settings.hooks || {};
 settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
 const cmd = process.env.HOME + '/.claude/hooks/list-vms.sh';
-// New format: each entry is { matcher: string, hooks: [{type, command}] }
-const already = settings.hooks.UserPromptSubmit.some(e => e.hooks && e.hooks.some(h => h.command === cmd));
-if (!already) settings.hooks.UserPromptSubmit.push({ matcher: '', hooks: [{ type: 'command', command: cmd }] });
+const already = settings.hooks.UserPromptSubmit.some(
+  e => e.hooks && e.hooks.some(h => h.command === cmd)
+);
+if (!already) {
+  settings.hooks.UserPromptSubmit.push({ matcher: '', hooks: [{ type: 'command', command: cmd }] });
+}
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 JSEOF
+
+# ---------------------------------------------------------------------------
+# 9. Install and start systemd service
+# ---------------------------------------------------------------------------
+sudo cp "$SCRIPT_DIR/utherbox-remote-session.service" /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now utherbox-remote-session
 
 echo "utherbox-claude setup complete"
