@@ -71,13 +71,15 @@ JSEOF
 # ---------------------------------------------------------------------------
 # 6. Install ~/CLAUDE.md
 # ---------------------------------------------------------------------------
-cp "$SCRIPT_DIR/UTHERBOX-CLAUDE.md" ~/CLAUDE.md
+ln -sfn "$SCRIPT_DIR/UTHERBOX-CLAUDE.md" ~/CLAUDE.md
 
 # ---------------------------------------------------------------------------
-# 7. Install skills
+# 7. Install skills (symlink each skill dir — preserves user-created skills)
 # ---------------------------------------------------------------------------
 mkdir -p ~/.claude/skills
-cp -r "$SCRIPT_DIR/skills/." ~/.claude/skills/
+for skill_dir in "$SCRIPT_DIR/skills"/*/; do
+  ln -sfn "$skill_dir" ~/.claude/skills/"$(basename "$skill_dir")"
+done
 
 # ---------------------------------------------------------------------------
 # 8. Install hooks
