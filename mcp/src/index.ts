@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { registerVmTools } from './tools/vms.js';
 
 export interface Credentials {
   platform_api_token: string;
@@ -87,7 +88,6 @@ export class ApiClient {
 }
 
 // Tool registration imports (added in subsequent tasks)
-// import { registerVmTools } from './tools/vms.js';
 // import { registerStorageTools } from './tools/storage.js';
 // import { registerDnsTools } from './tools/dns.js';
 // import { registerDomainsTools } from './tools/domains.js';
@@ -131,9 +131,7 @@ async function main(): Promise<void> {
     version: '1.0.0',
   });
 
-  // Tools registered in subsequent tasks
-  // Remove this line when adding the first registerXxxTools() call below:
-  void projectId;
+  registerVmTools(server, client, projectId);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

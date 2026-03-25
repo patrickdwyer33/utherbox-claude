@@ -8,7 +8,7 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.10.0",
     "zod": "^3.0.0"
   },
   "devDependencies": {
