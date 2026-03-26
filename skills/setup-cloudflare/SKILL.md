@@ -2,7 +2,12 @@
 description: Link a Cloudflare API token and zone to this account for DNS management
 ---
 
-Use this skill when the user wants to manage DNS for their own domain. Required before `manage-dns` or `setup-tls` on a custom domain.
+Use this skill when:
+- The user wants to manage DNS for their own domain
+- A `cloudflare_not_configured` error is returned from any MCP DNS operation (`list_dns_records`, `create_dns_record`, etc.)
+- Project creation fails with `cloudflare_not_configured`
+
+Required before `manage-dns`, `setup-tls`, `create_dns_record`, or any Cloudflare DNS operation.
 
 ## Steps
 
