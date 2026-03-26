@@ -81,6 +81,23 @@ for skill_dir in "$SCRIPT_DIR/skills"/*/; do
   ln -sfn "$skill_dir" ~/.claude/skills/"$(basename "$skill_dir")"
 done
 
+# Install post-merge git hook to auto-sync skill symlinks on git pull
+mkdir -p "$SCRIPT_DIR/.git/hooks"
+cat > "$SCRIPT_DIR/.git/hooks/post-merge" << 'HOOK'
+#!/usr/bin/env bash
+set -euo pipefail
+SKILL_SOURCE="$HOME/utherbox-claude/skills"
+SKILL_TARGET="$HOME/.claude/skills"
+mkdir -p "$SKILL_TARGET"
+for skill_dir in "$SKILL_SOURCE"/*/; do
+  skill_name="$(basename "$skill_dir")"
+  if [[ ! -e "$SKILL_TARGET/$skill_name" ]]; then
+    ln -sfn "$skill_dir" "$SKILL_TARGET/$skill_name"
+  fi
+done
+HOOK
+chmod +x "$SCRIPT_DIR/.git/hooks/post-merge"
+
 # ---------------------------------------------------------------------------
 # 8. Install plugins
 # ---------------------------------------------------------------------------
