@@ -110,6 +110,9 @@ const already = settings.hooks.UserPromptSubmit.some(
 if (!already) {
   settings.hooks.UserPromptSubmit.push({ matcher: '', hooks: [{ type: 'command', command: cmd }] });
 }
+settings.permissions = settings.permissions || {};
+settings.permissions.allow = ['Bash(*)', 'WebSearch', 'WebFetch'];
+settings.permissions.deny = settings.permissions.deny || [];
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 JSEOF
 
