@@ -82,7 +82,13 @@ for skill_dir in "$SCRIPT_DIR/skills"/*/; do
 done
 
 # ---------------------------------------------------------------------------
-# 8. Install hooks
+# 8. Install plugins
+# ---------------------------------------------------------------------------
+claude plugin marketplace add obra/superpowers-marketplace 2>/dev/null || true
+claude plugin install superpowers 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 9. Install hooks
 # ---------------------------------------------------------------------------
 if [ -d "$SCRIPT_DIR/hooks" ]; then
   mkdir -p ~/.claude/hooks
@@ -108,7 +114,7 @@ fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 JSEOF
 
 # ---------------------------------------------------------------------------
-# 9. Install and start systemd service
+# 10. Install and start systemd service
 # ---------------------------------------------------------------------------
 sudo cp "$SCRIPT_DIR/utherbox-remote-session.service" /etc/systemd/system/
 sudo systemctl daemon-reload
