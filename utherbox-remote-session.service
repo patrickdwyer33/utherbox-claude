@@ -2,13 +2,16 @@
 Description=Utherbox Remote Session
 After=network-online.target
 Wants=network-online.target
+# Skip start entirely if OAuth credentials were not injected at provisioning.
+# This prevents a crash-restart loop when the user hasn't linked Claude auth yet.
+ConditionPathExists=/home/claude/.claude/.credentials.json
+# Stop restarting after 5 failures in 5 minutes (e.g. revoked credentials).
+StartLimitBurst=5
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
 User=claude
-# Skip start entirely if OAuth credentials were not injected at provisioning.
-# This prevents a crash-restart loop when the user hasn't linked Claude auth yet.
-ConditionPathExists=/home/claude/.claude/.credentials.json
 WorkingDirectory=/home/claude
 ExecStart=/home/claude/utherbox-claude/remote-session.sh
 Environment=PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -16,9 +19,6 @@ StandardOutput=append:/home/claude/remote-session.log
 StandardError=append:/home/claude/remote-session.log
 Restart=always
 RestartSec=10
-# Stop restarting after 5 failures in 5 minutes (e.g. revoked credentials).
-StartLimitBurst=5
-StartLimitIntervalSec=300
 
 [Install]
 WantedBy=multi-user.target
