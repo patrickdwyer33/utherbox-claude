@@ -39,7 +39,7 @@ create_dns_record(
   name: "<subdomain>.<domain>",
   content: "<ip>",
   ttl: 1,          # 1 = automatic (recommended)
-  proxied: false,  # true to route through Cloudflare proxy
+  proxied: false,  # default: always false. Only set true if the user explicitly asks for Cloudflare proxy.
 )
 ```
 
