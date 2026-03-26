@@ -2,7 +2,7 @@
 description: Install Caddy web server with automatic TLS
 ---
 
-Caddy handles TLS automatically via ACME. Prefer it over nginx when TLS simplicity matters more than fine-grained config.
+Caddy handles TLS automatically via ACME. Use only when the user specifically requests Caddy — nginx is the platform default (use `setup-nginx` skill instead).
 
 ## Steps
 

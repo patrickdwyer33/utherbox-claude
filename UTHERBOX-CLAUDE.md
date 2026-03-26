@@ -108,6 +108,10 @@ Your platform API token is at `~/.utherbox-credentials.json`:
 
 ---
 
+## Defaults
+
+- **Web server: nginx.** When a user asks to deploy, serve, or expose a web app, use `setup-nginx` unless they specifically request Caddy. Caddy is available (`setup-caddy` skill) but nginx is the platform standard.
+
 ## Common Patterns
 
 | Goal | Approach |
