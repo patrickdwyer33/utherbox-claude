@@ -27,7 +27,9 @@ fi
 
 ### 4. Choose issuance mode
 
-**Prefer webroot mode** when a web server is already installed. Standalone mode has a race condition: acme.sh starts socat on port 80, then Let's Encrypt validates immediately — if socat hasn't bound yet, validation fails with "Connection refused."
+**Prefer webroot mode** when a web server is already installed — it's simpler and more reliable.
+
+**Standalone mode** uses socat to listen on port 80. This fails when running as a non-root user (e.g. `claude`) because port 80 is privileged. Use `sudo` to run acme.sh in standalone mode, or use webroot mode instead.
 
 Check if nginx or caddy is installed:
 ```bash
@@ -56,7 +58,9 @@ sudo chown $(whoami):$(whoami) /var/www/<domain>
 ~/.acme.sh/acme.sh --issue -d <domain> --webroot /var/www/<domain> --server letsencrypt
 ```
 
-**If no web server is installed → use standalone mode (fallback):**
+**If no web server is installed → use standalone mode:**
+
+Standalone requires either root or sudo because socat must bind to port 80 (privileged).
 
 1. Ensure port 80 is free:
 ```bash
@@ -64,12 +68,12 @@ sudo ss -tlnp | grep :80
 # If something is listening, stop it first
 ```
 
-2. Issue the certificate:
+2. Issue the certificate (note `sudo`):
 ```bash
-~/.acme.sh/acme.sh --issue -d <domain> --standalone --server letsencrypt
+sudo ~/.acme.sh/acme.sh --issue -d <domain> --standalone --server letsencrypt
 ```
 
-If standalone fails with "Connection refused," install nginx first and use webroot mode instead.
+If you omit `sudo`, socat will fail with "Permission denied" or "Connection refused."
 
 ### 5. Install to /etc/ssl/
 ```bash
@@ -97,7 +101,7 @@ Expected: `HTTP/2 200` or similar. If you see a certificate error, check `/var/l
 
 ## Error handling
 
-- **"Connection refused" in standalone mode** — socat race condition. Switch to webroot mode with nginx or caddy instead. This is the most common failure mode for standalone.
+- **"Connection refused" or "Permission denied" in standalone mode** — socat can't bind to port 80 without root. Use `sudo ~/.acme.sh/acme.sh --standalone ...` or switch to webroot mode with nginx/caddy.
 - **Rate limited by Let's Encrypt** — acme.sh will surface this. Wait before retrying. For testing, use `--server letsencrypt_test` (produces untrusted cert but avoids rate limits).
 - **DNS not yet propagated** — wait and retry. `dig @8.8.8.8 +short A <domain>` to check from Google's resolver.
 - **Port 80 blocked by firewall** — if on a cloud provider, check security group / firewall rules. Linode VMs have no firewall by default.
