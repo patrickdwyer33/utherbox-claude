@@ -25,22 +25,53 @@ if [ ! -f ~/.acme.sh/acme.sh ]; then
 fi
 ```
 
-### 4. Ensure port 80 is open
-acme.sh HTTP-01 requires port 80 to be reachable. Check if nginx/caddy is already running:
+### 4. Choose issuance mode
+
+**Prefer webroot mode** when a web server is already installed. Standalone mode has a race condition: acme.sh starts socat on port 80, then Let's Encrypt validates immediately — if socat hasn't bound yet, validation fails with "Connection refused."
+
+Check if nginx or caddy is installed:
 ```bash
-ss -tlnp | grep :80
-```
-If something is already listening on 80, stop it temporarily:
-```bash
-sudo systemctl stop nginx 2>/dev/null || sudo systemctl stop caddy 2>/dev/null || true
+command -v nginx || command -v caddy
 ```
 
-### 5. Issue the certificate
+**If a web server is installed → use webroot mode (recommended):**
+
+1. Ensure it's running on port 80 (even a minimal config is fine):
+```bash
+# For nginx: create a minimal config if needed
+echo 'server { listen 80; server_name <domain>; root /var/www/<domain>; }' \
+  | sudo tee /etc/nginx/sites-available/<domain> > /dev/null
+sudo ln -sf /etc/nginx/sites-available/<domain> /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl start nginx
+```
+
+2. Create the webroot directory:
+```bash
+sudo mkdir -p /var/www/<domain>
+sudo chown $(whoami):$(whoami) /var/www/<domain>
+```
+
+3. Issue the certificate:
+```bash
+~/.acme.sh/acme.sh --issue -d <domain> --webroot /var/www/<domain> --server letsencrypt
+```
+
+**If no web server is installed → use standalone mode (fallback):**
+
+1. Ensure port 80 is free:
+```bash
+sudo ss -tlnp | grep :80
+# If something is listening, stop it first
+```
+
+2. Issue the certificate:
 ```bash
 ~/.acme.sh/acme.sh --issue -d <domain> --standalone --server letsencrypt
 ```
 
-### 6. Install to /etc/ssl/
+If standalone fails with "Connection refused," install nginx first and use webroot mode instead.
+
+### 5. Install to /etc/ssl/
 ```bash
 sudo mkdir -p /etc/ssl/<domain>
 ~/.acme.sh/acme.sh --install-cert -d <domain> \
@@ -53,12 +84,12 @@ sudo chmod 600 /etc/ssl/<domain>/key.pem
 sudo chown root:root /etc/ssl/<domain>/*.pem
 ```
 
-### 7. Restart the web server
+### 6. Restart the web server
 ```bash
 sudo systemctl start nginx 2>/dev/null || sudo systemctl start caddy 2>/dev/null || true
 ```
 
-### 8. Verify
+### 7. Verify
 ```bash
 curl -sI https://<domain> | head -1
 ```
@@ -66,6 +97,7 @@ Expected: `HTTP/2 200` or similar. If you see a certificate error, check `/var/l
 
 ## Error handling
 
+- **"Connection refused" in standalone mode** — socat race condition. Switch to webroot mode with nginx or caddy instead. This is the most common failure mode for standalone.
 - **Rate limited by Let's Encrypt** — acme.sh will surface this. Wait before retrying. For testing, use `--server letsencrypt_test` (produces untrusted cert but avoids rate limits).
 - **DNS not yet propagated** — wait and retry. `dig @8.8.8.8 +short A <domain>` to check from Google's resolver.
 - **Port 80 blocked by firewall** — if on a cloud provider, check security group / firewall rules. Linode VMs have no firewall by default.
