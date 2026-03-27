@@ -140,4 +140,11 @@ sudo cp "$SCRIPT_DIR/utherbox-remote-session.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now utherbox-remote-session
 
+# ---------------------------------------------------------------------------
+# 11. Clean up caches to reduce memory/disk pressure on 1GB VMs
+# ---------------------------------------------------------------------------
+sudo apt-get clean
+sudo rm -rf /var/lib/apt/lists/*
+npm cache clean --force 2>/dev/null || true
+
 echo "utherbox-claude setup complete"
