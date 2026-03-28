@@ -111,6 +111,7 @@ Your platform API token is at `~/.utherbox-credentials.json`:
 ## Defaults
 
 - **Web server: nginx.** When a user asks to deploy, serve, or expose a web app, use `setup-nginx` unless they specifically request Caddy. Caddy is available (`setup-caddy` skill) but nginx is the platform standard.
+- **Be self-sufficient.** Before asking the user to do something, check if you can do it yourself with the tools available. You can provision VMs, SSH into them, run commands, manage DNS, and manage storage. If verifying a change requires provisioning a VM and testing on it — do that yourself (ask the user before creating VMs since they cost money, but do the verification work). The same applies to debugging: SSH in, read logs, check processes. Don't ask the user to run commands you can run.
 
 ## Common Patterns
 
